@@ -1,4 +1,2 @@
 # IGHelper
 Indiegala helper
-
-test
