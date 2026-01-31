@@ -1,0 +1,8 @@
+#main-menu-galasilver {
+  color: white;
+}
+#main-menu-galasilver span {
+  padding: 4px 8px;
+  border: 2px solid white;
+  border-radius: 25px;
+}

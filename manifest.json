@@ -1,0 +1,81 @@
+{
+  "manifest_version": 3,
+  "name": "IG Helper",
+  "version": "1.0.0",
+  "description": "Indiegala Helper",
+  "icons": {
+    "16": "assets/images/igh-icon/icon_16.ico",
+    "32": "assets/images/igh-icon/icon_32.ico",
+    "48": "assets/images/igh-icon/icon_48.ico",
+    "64": "assets/images/igh-icon/icon_64.ico",
+    "96": "assets/images/igh-icon/icon_96.ico",
+    "128": "assets/images/igh-icon/icon_128.ico",
+    "256": "assets/images/igh-icon/icon_256.ico"
+  },
+  "action": {
+	  "default_popup": "popup/popup.html"
+	},
+  "background": {
+    "service_worker": "service_worker/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.indiegala.com/*"],
+      "js": [
+        "assets/js/jquery/3.7.1/jquery.min.js", 
+        "assets/js/general-helper-functions.js", 
+        "assets/js/extension-helper-functions.js"
+      ],
+      "css": ["assets/css/igh.css"],
+      "run_at": "document_start"
+    },
+    {
+			"matches": ["*://*.indiegala.com/*"],
+			"js": ["pages/indiegala/index.js"],
+      "css": ["pages/indiegala/stylesheet.css"],
+      "run_at": "document_end"
+		},
+    {
+      "matches": ["*://*.indiegala.com/giveaways*"],
+      "exclude_matches": ["*://*.indiegala.com/giveaways/card*"],
+      "js": ["pages/indiegala-giveaways/index.js"],
+      "css": ["pages/indiegala-giveaways/stylesheet.css"],
+      "run_at": "document_end"
+    },
+    {
+      "matches": ["*://*.indiegala.com/giveaways/card*"],
+      "js": ["pages/indiegala-giveaways-card/index.js"],
+      "css": ["pages/indiegala-giveaways-card/stylesheet.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "matches": [ "*://*.indiegala.com/*" ],
+      "resources": [
+        "assets/json/platform.json",
+        "assets/images/icons/feudalife.png",
+        "assets/images/icons/steamdb.svg",
+        "assets/images/icons/indiegala.ico",
+        "assets/images/icons/steam.ico",
+        "assets/images/icons/legacy-games.ico",
+        "assets/images/icons/gog.ico",
+        "assets/images/icons/xbox.ico"
+      ]
+    }
+  ],
+  "permissions": [
+    "nativeMessaging", 
+    "storage",
+    "cookies",
+    "unlimitedStorage",
+    "scripting",
+    "webRequest",
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "*://*.indiegala.com/*",
+    "https://store.steampowered.com/*"
+  ]
+}

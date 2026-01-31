@@ -1,0 +1,215 @@
+.card-contents-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: calc(100% - 60px);
+  z-index: 30;
+  font-size: 5em;
+  color: white;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 30px 0;
+}
+
+.card-blackout .card-title > h1,
+.card-blackout .card-ticket,
+.card-blackout .card-indicators,
+.card-blackout .card-contents-padding {
+  background-color: #000 !important;
+}
+.card-blackout .card-title > h1,
+.card-blackout .card-contents-padding,
+.card-blackout .card-join-info {
+  color: #FFF !important;
+}
+.card-blackout .card-ticket-tooth {
+  filter: opacity(0%);
+}
+
+.card-indicators {
+  color: #000;
+  background-color: #FFF;
+  min-height:50px;
+  display: flex;
+  /* justify-content: space-around; */
+  align-items: center;
+  padding: 30px 10px 20px;
+}
+
+.product-type-unknown-icon {
+  color: white !important;
+  background-color: black !important;
+  font-size: 18px !important;
+  border-radius: 25px !important;
+}
+.product-type-game-icon {
+  color: var(--igh-game) !important;
+}
+.product-type-dlc-icon {
+  color: var(--igh-dlc) !important;
+}
+.product-type-music-icon {
+  color: var(--igh-music)  !important;
+}
+.product-type-package-icon {
+  color: var(--igh-package)  !important;
+}
+.product-type-hardware-icon {
+  color: var(--igh-hardware)  !important;
+}
+.product-type-mod-icon {
+  color: var(--igh-mod)  !important;
+}
+.product-type-demo-icon {
+  color: var(--igh-demo)  !important;
+}
+.product-type-video-icon,
+.product-type-episode-icon,
+.product-type-series-icon {
+  color: var(--igh-video)  !important;
+}
+
+.card-indicators-btns-product-refresh,
+.card-indicators-btns-key-ownership,
+.card-indicators-btns-product-ownership,
+.card-indicators-icons-product,
+.card-indicators-icons-steamdb,
+.card-indicators-icons-description {
+  width: 24px;
+  height: 24px;
+}
+.card-indicators-icons-owner {
+  width: 32px;
+  height: 32px;
+}
+.card-indicators-icons-steamdb img,
+.card-indicators-icons-owner img,
+.card-indicators-platforms img {
+  width: 24px;
+}
+
+.card-page[data-owner-id=''] .card-indicators-icons-owner {
+  width: 24px;
+  height: 24px;
+}
+
+.card-indicators-platforms > div {
+  border: 2px solid white;
+  border-radius: 25px;
+}
+
+.card-indicators-icons {
+  font-size: 20px;
+}
+
+.card-indicators-btns-product-refresh,
+.card-indicators-btns-key-ownership,
+.card-indicators-btns-product-ownership,
+.card-indicators-icons-description {
+  font-size: 24px;
+}
+
+/* Badges */
+.product-status-badge,
+.product-base-game-badge,
+.product-base-game-owned-badge,
+.package-owned-apps-badge,
+.package-owned-keys-badge, 
+.package-items-owned-badge,
+.key-owned-badge {
+  height: 12px;
+  width: 12px;
+  font-size: 12px;
+  display: block;
+}
+.package-apps-badge,
+.owner-level-badge {
+  padding: 2px 4px;
+  border-radius: 25px;
+  font-size: 10px;
+  line-height: 1;
+  min-height: 12px;
+  font-weight: 400;
+  vertical-align: baseline;
+  right: -7px!important;
+  cursor: default!important;
+}
+.platform-badge img {
+  width: 12px;
+  display: block;
+}
+.feudalife-badge img {
+  width: 24px;
+  display: block;
+}
+
+.badge-top-left {
+  left: -5px;
+  top: -5px;
+}
+.badge-top-right {
+  right: -5px;
+  top: -5px;
+}
+.badge-bottom-left {
+  left: -5px;
+  bottom: -5px;
+}
+.badge-bottom-right {
+  bottom: -5px;
+  right: -5px;
+}
+
+.card-indicators-icons-product .product-type-unknown-icon ~ .product-status-badge,
+.card-indicators-icons-product .product-type-package-icon ~ .product-status-badge,
+.card-indicators-icons-product .product-type-dlc-icon ~ .product-status-badge,
+.card-indicators-icons-product .product-type-music-icon ~ .product-status-badge,
+.card-indicators-icons-product .product-type-video-icon ~ .product-status-badge,
+.card-indicators-icons-product .product-type-package-icon ~ .package-owned-keys-badge,
+.card-indicators-platforms .key-owned-badge {
+  top: -9px !important;
+}
+
+.card-indicators-icons-product .product-type-dlc-icon ~ .product-base-game-badge,
+.card-indicators-icons-product .product-type-music-icon ~ .product-base-game-badge {
+  top: -8px !important;
+  padding: 0px 9px 0px 8px !important;
+}
+.card-indicators-icons-product .product-type-dlc-icon ~ .product-base-game-badge,
+.card-indicators-icons-product .product-type-package-icon ~ .package-owned-keys-badge,
+.card-indicators-platforms .key-owned-badge {
+  right: -7px !important;
+}
+.card-indicators-icons-product .product-type-music-icon ~ .product-base-game-badge {
+  right: -10px !important;
+}
+
+.card-indicators-icons-product .product-type-dlc-icon ~ .product-base-game-owned-badge,
+.card-indicators-icons-product .product-type-music-icon ~ .product-base-game-owned-badge,
+.card-indicators-icons-product .product-type-package-icon ~ .package-owned-apps-badge {
+  bottom: -2px;
+}
+
+.card-indicators-icons-product .product-type-package-icon ~ .package-owned-keys-badge,
+.card-indicators-platforms .key-owned-badge {
+  font-size: 10px;
+  padding: 7px 7px 7px 8px !important;
+}
+
+.card-indicators-platforms .package-items-owned-badge {
+  font-size: 14px;
+  top: -10px;
+  right: -3px;
+}
+
+.card-indicators-icons-owner .owner-level-badge {
+  bottom: -1px;
+}
+
+.card-indicators-icons-description .feudalife-badge {
+  left: 0px;
+}
