@@ -5,7 +5,10 @@ console.log('[IG Helper Extension] indiegala');
 var indiegala = {
   loaded: false,
   loading: true,
-  interval: { init: null },
+  interval: { 
+    init: null, ighMenu: null, galasilver: null, accountProgress: null, 
+    updateSteamLoginIndicator: null,
+  },
   observer: { galasilver: undefined, },
 }
 
@@ -20,13 +23,58 @@ initIndiegala();
 async function initIndiegala() {
   await resetIndiegala();
 
+  setupIghMenu();
+  setupAccountProgress();
+  indiegala.loading = false;
+  indiegala.loaded = true;
+}
+
+async function resetIndiegala() {
+  indiegala.loaded = false;
+  indiegala.loading = true;
+
+  ghf.json.each(indiegala.interval, function (key, value) {
+    if (value !== null) {
+      clearInterval(indiegala.interval[key]);
+      value = null;
+    }
+  });
+  ghf.json.each(indiegala.observer, function (key, value) {
+    if (value !== undefined)
+      indiegala_giveaways.observer[key].disconnect();
+  });
+}
+
+async function setupIghMenu() {
   let counter = 0;
-  indiegala.interval.init = setInterval(async function () {
+  indiegala.interval.ighMenu = setInterval(async function () {
+    counter++;
+    if ($('.header-menu').last().length > 0) {
+      clearInterval(indiegala.interval.ighMenu);
+      $('.header-menu').last().addClass('igh-menu');
+      $('.igh-menu').last().find('ul')
+        .prepend(`
+          <li id="igh-galasilver" style="display:none;"><span><strong class="coins-amount"><i class="fa fa-spinner fa-spin"></i></strong> iS</span></li>
+          <li id="igh-steam-login-status" class="" title="" style="display:none;"><i aria-hidden="true" class="fa fa-steam-square"></i></li>
+        `);
+
+      await setupGalaSilver();
+      await setupSteamLoginIndicator();
+    } else if (counter >= 100) {
+      clearInterval(indiegala.interval.ighMenu);
+      console.log('Timeout: indiegala.interval.ighMenu');
+    }
+  }, 200);
+}
+
+async function setupGalaSilver() {
+  let counter = 0;
+  indiegala.interval.galasilver = setInterval(async function () {
     counter++;
     if ($('#galasilver-amount').length > 0) {
-      clearInterval(indiegala.interval.init);
+      clearInterval(indiegala.interval.galasilver);
 
-      $('.header-menu').last().find('ul').prepend('<li id="main-menu-galasilver"><span><strong class="coins-amount"><i class="fa fa-spinner fa-spin"></i></strong> iS</span></li>')
+      $('#igh-galasilver').show();
       updateGalaSilver();
 
       var galasilverEl = document.getElementById('galasilver-amount');
@@ -39,72 +87,41 @@ async function initIndiegala() {
       });
       indiegala.observer.galasilver.observe(galasilverEl, { childList: true, subtree: true, characterData: true });
     } else if (counter >= 100) {
-      clearInterval(indiegala.interval.init);
+      clearInterval(indiegala.interval.galasilver);
+      console.log('Timeout: indiegala.interval.galasilver');
     }
   }, 200);
-  indiegala.loading = false;
-  indiegala.loaded = true;
 }
 
-async function resetIndiegala() {
-  indiegala.loaded = false;
-  indiegala.loading = true;
-  if (indiegala.interval.init !== null) {
-    clearInterval(indiegala.interval.init);
-    indiegala.interval.init = null;
-  }
-  if (indiegala.observer.galasilver !== undefined)
-    indiegala.observer.galasilver.disconnect();
+async function setupSteamLoginIndicator() {
+  let steamLoginStatus = await checkSteamLogin();
+
+  $('#igh-steam-login-status')
+    .attr('class', (steamLoginStatus ? 'igh-text-positive' : 'igh-text-negative'))
+    .attr('title', (steamLoginStatus ? `You're logged in to Steam in this browser` : `You're not logged in to Steam in this browser`))
+    .show();
+
+  // indiegala.interval.updateSteamLoginIndicator = setInterval(async function () {
+  //   let steamLoginStatus = await checkSteamLogin();
+  //   let statusClass = (steamLoginStatus ? 'igh-text-positive' : 'igh-text-negative');
+  //   let statusTooltip = (steamLoginStatus ? `You're logged in to Steam in this browser` : `You're not logged in to Steam in this browser`);
+  //   $('#igh-steam-login-status').attr('class', statusClass).attr('title', statusTooltip);
+  // }, 5000);
 }
 
-function updateGalaSilver(galasilver) {
-  galasilver = galasilver ?? $('#galasilver-amount').text();
-  $('#main-menu-galasilver .coins-amount').html(galasilver);
-  return galasilver;
-}
-
-async function getPlatforms() {
-  let platforms = await ehf.fetch(chrome.runtime.getURL(`assets/json/platform.json`));
-  ghf.json.each(platforms, function(platformKey, platformJSON) {
-      platformJSON.iconUrl = chrome.runtime.getURL(`assets/images/icons/${platformKey}.ico`);
-  });
-  return platforms;
-}
-
-async function getAccountInfo() {
-  const sessionidCookie = await ehf.chrome('cookies.get', {
-    url: 'https://www.indiegala.com',
-    name: 'sessionid'
-  });
-
-  if (!sessionidCookie) {
-    return;
-  }
-
-  let sessionid = sessionidCookie.value;
-  let indiegalaAccount = await ehf.storage.local.get('indiegalaAccount');
-  if (ghf.is.jsonEmpty(indiegalaAccount)) {
-    indiegalaAccount = account;
-    await ehf.storage.local.set('indiegalaAccount', indiegalaAccount);
-  }
-  if (!indiegalaAccount.sessionid || indiegalaAccount.sessionid !== sessionid) {
-    indiegalaAccount.sessionid = sessionid;
-    
-    const libraryHtml = await ehf.fetch("https://www.indiegala.com/library");
-    indiegalaAccount.link =
-      $(libraryHtml).find('.profile-private-page-avatar a')?.attr('href') ?? '';
-
-    indiegalaAccount.id = indiegalaAccount.link
-      ? indiegalaAccount.link.split('/').pop()
-      : '';
-
-    indiegalaAccount.username =
-      $(libraryHtml).find('.profile-private-page-user-row').html();
-  }
-
-  const accountInfo = await ehf.fetch("https://www.indiegala.com/library/giveaways/user-level-and-coins", { credentials: "include" });
-  Object.assign(indiegalaAccount, accountInfo);
-
-  await ehf.storage.local.set('indiegalaAccount', indiegalaAccount);
-  return indiegalaAccount;
+function setupAccountProgress() {
+  let counter = 0;
+  indiegala.interval.accountProgress = setInterval(async function () {
+    counter++;
+    if ($('.user-wallet').length > 0) {
+      clearInterval(indiegala.interval.accountProgress);
+      $('.user-wallet > div').last().show();
+      const accountInfo = await ehf.fetch("https://www.indiegala.com/library/giveaways/user-level-and-coins", { credentials: "include" });
+      $('#userGiveawaysLevel').text(accountInfo.current_level);
+      $('#userGiveawaysPoints').text(accountInfo.current_points);
+    } else if (counter >= 100) {
+      clearInterval(indiegala.interval.accountProgress);
+      console.log('Timeout: indiegala.interval.accountProgress');
+    }
+  }, 200);
 }

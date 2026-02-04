@@ -5,9 +5,10 @@ console.log('[IG Helper Extension] indiegala-giveaways');
 var indiegala_giveaways = {
   loaded: false,
   loading: true,
-  interval: { indiegala: null, init: { ['giveaways']: null, ['giveaways_curtain']: null, ['giveaways_carousel']: null, }, },
+  interval: { indiegala: null, init_giveaways: null, init_giveawaysCurtain: null, init_giveawaysCarousel: null, },
   observer: { curtain: undefined, results: undefined, },
 };
+var settings = {};
 var account = {
   id: undefined, username: undefined, link: '', sessionid: '',
   current_level: 0, points_to_next_level: '-', experience_bar_width: 0, status: 'ok', current_points: 0, current_floor: 5000
@@ -32,10 +33,10 @@ async function initGiveaways() {
   await resetGiveaways();
 
   // Carousel
-  indiegala_giveaways.interval.init.giveaways_carousel = setInterval(function () {
+  indiegala_giveaways.interval.init_giveawaysCarousel = setInterval(function () {
     $('.carousel, .carousel-control-prev, .carousel-control-prev, .page-slider-title').hide();
     if (indiegala?.loaded === true && indiegala_giveaways?.loaded === true) {
-      clearInterval(indiegala_giveaways.interval.init.giveaways_carousel);
+      clearInterval(indiegala_giveaways.interval.init_giveawaysCarousel);
       if (!account || !account?.sessionid) {
         $('.carousel, .carousel-control-prev, .carousel-control-prev, .page-slider-title').show();
       }
@@ -43,9 +44,9 @@ async function initGiveaways() {
   }, 200);
 
   await new Promise(resolve => {
-    indiegala_giveaways.interval.init.giveaways_curtain = setInterval(function () {
+    indiegala_giveaways.interval.init_giveawaysCurtain = setInterval(function () {
       if ($('.page-contents-ajax-list-cover').length > 0) {
-        clearInterval(indiegala_giveaways.interval.init.giveaways_curtain);
+        clearInterval(indiegala_giveaways.interval.init_giveawaysCurtain);
         resolve();
       }
     }, 200)
@@ -59,7 +60,7 @@ async function initGiveaways() {
 
   await new Promise(resolve => {
     indiegala_giveaways.interval.indiegala = setInterval(function () {
-      if (ghf.is.function(getAccountInfo)) {
+      if (typeof indiegala !== 'undefined') {
         clearInterval(indiegala_giveaways.interval.indiegala);
         resolve();
       }
@@ -67,7 +68,8 @@ async function initGiveaways() {
   });
 
   account = await getAccountInfo();
-  if (account && account.sessionid) {
+  if (typeof account !== 'undefined' && account.sessionid) {
+    settings = await getSettings();
     await new Promise(async (resolve) => {
       platform = await getPlatformsOwnedProducts();
       giveawaysDB = await ehf.storage.local.get('indiegalaGiveaways');
@@ -82,7 +84,7 @@ async function initGiveaways() {
     });
 
     await new Promise(resolve => {
-      indiegala_giveaways.interval.init.giveaways = setInterval(function () {
+      indiegala_giveaways.interval.init_giveaways = setInterval(function () {
         if (
           indiegala?.loaded === true
           && !ghf.is.jsonEmpty(platform)
@@ -90,7 +92,7 @@ async function initGiveaways() {
           && $('.page-contents-ajax-list').length > 0
           && $('.page-contents-list .items-list-col').length > 0
         ) {
-          clearInterval(indiegala_giveaways.interval.init.giveaways);
+          clearInterval(indiegala_giveaways.interval.init_giveaways);
           resolve();
         }
       }, 200);
@@ -131,26 +133,17 @@ async function initGiveaways() {
 async function resetGiveaways() {
   indiegala_giveaways.loaded = false;
   indiegala_giveaways.loading = true;
-  if (indiegala_giveaways.interval.indiegala !== null) {
-    clearInterval(indiegala_giveaways.interval.indiegala);
-    indiegala_giveaways.interval.indiegala = null;
-  }
-  if (indiegala_giveaways.interval.init.giveaways !== null) {
-    clearInterval(indiegala_giveaways.interval.init.giveaways);
-    indiegala_giveaways.interval.init.giveaways = null;
-  }
-  if (indiegala_giveaways.interval.init.giveaways_curtain !== null) {
-    clearInterval(indiegala_giveaways.interval.init.giveaways_curtain);
-    indiegala_giveaways.interval.init.giveaways_curtain = null;
-  }
-  if (indiegala_giveaways.interval.init.giveaways_carousel !== null) {
-    clearInterval(indiegala_giveaways.interval.init.giveaways_carousel);
-    indiegala_giveaways.interval.init.giveaways_carousel = null;
-  }
-  if (indiegala_giveaways.observer.curtain !== undefined)
-    indiegala_giveaways.observer.curtain.disconnect();
-  if (indiegala_giveaways.observer.results !== undefined)
-    indiegala_giveaways.observer.results.disconnect();
+
+  ghf.json.each(indiegala_giveaways.interval, function (key, value) {
+    if (value !== null) {
+      clearInterval(indiegala.interval[key]);
+      value = null;
+    }
+  });
+  ghf.json.each(indiegala_giveaways.observer, function (key, value) {
+    if (value !== undefined)
+      indiegala_giveaways.observer[key].disconnect();
+  });
   account = {
     id: undefined, username: undefined, link: '', sessionid: '',
     current_level: 0, points_to_next_level: '-', experience_bar_width: 0, status: 'ok', current_points: 0, current_floor: 5000
@@ -165,30 +158,42 @@ async function resetGiveaways() {
 
 async function getPlatformsOwnedProducts() {
   let platforms = await getPlatforms();
-  ghf.json.each(platforms, function (platformKey, platformJSON) {
-    (async () => {
-      let ownedProductsApp = await ehf.storage.local.get(`${platformKey}_ownedProductsApp`, []);
-      let ownedProductsSub = await ehf.storage.local.get(`${platformKey}_ownedProductsSub`, []);
-      let ownedKeysApp = await ehf.storage.local.get(`${platformKey}_ownedKeysApp`, []);
-      let ownedKeysSub = await ehf.storage.local.get(`${platformKey}_ownedKeysSub`, []);
-      if (platformKey === 'steam') {
-        await new Promise(async (resolve) => {
-          await ehf.fetch('https://store.steampowered.com/dynamicstore/userdata/', { credentials: 'include' })
-            .then(async (userData) => {
-              if (userData.rgOwnedApps.length > 0 || userData.rgOwnedPackages.length > 0) {
-                ownedProductsApp = userData.rgOwnedApps;
-                ownedProductsSub = userData.rgOwnedPackages;
-                await ehf.storage.local.set(`${platformKey}_ownedProductsApp`, ownedProductsApp);
-                await ehf.storage.local.set(`${platformKey}_ownedProductsSub`, ownedProductsSub);
-              }
-            }).finally(() => { resolve(); });
-        });
-      }
-      platformJSON.ownedProducts.app = ownedProductsApp;
-      platformJSON.ownedProducts.sub = ownedProductsSub;
-      platformJSON.ownedKeys.app = ownedKeysApp;
-      platformJSON.ownedKeys.sub = ownedKeysSub;
-    })()
+  ghf.json.each(platforms, async function (platformKey, platformJSON) {
+    let ownedProductsApp = await ehf.storage.local.get(`${platformKey}_ownedProductsApp`, []);
+    let ownedProductsSub = await ehf.storage.local.get(`${platformKey}_ownedProductsSub`, []);
+    let ownedKeysApp = await ehf.storage.local.get(`${platformKey}_ownedKeysApp`, []);
+    let ownedKeysSub = await ehf.storage.local.get(`${platformKey}_ownedKeysSub`, []);
+    if (
+      platformKey === 'steam'
+      && await checkSteamLogin()
+      && (settings?.lastSteamOwnedProductsRequest || 0) + (30 * 60 * 1000) < Date.now()) // 30m
+    {
+      settings.lastSteamOwnedProductsRequest = Date.now();
+      await setSettings(settings);
+      await new Promise(async (resolve) => {
+        await ehf.fetch('https://store.steampowered.com/dynamicstore/userdata/', { credentials: 'include' })
+          .then(async (userData) => {
+            if (userData.rgOwnedApps.length > 0 || userData.rgOwnedPackages.length > 0) {
+              ownedProductsApp = userData.rgOwnedApps;
+              ownedProductsSub = userData.rgOwnedPackages;
+              await ehf.storage.local.set(`${platformKey}_ownedProductsApp`, ownedProductsApp);
+              await ehf.storage.local.set(`${platformKey}_ownedProductsSub`, ownedProductsSub);
+            } else {
+              platformJSON.metadata.failedRequest = true;
+            }
+          }).finally(() => { resolve(); });
+      });
+    } else if (
+      platformKey === 'steam'
+      && (!(await checkSteamLogin())
+        || (ownedProductsApp.length === 0 && ownedProductsSub.length === 0))
+    ) {
+      platformJSON.metadata.failedRequest = true;
+    }
+    platformJSON.ownedProducts.app = ownedProductsApp;
+    platformJSON.ownedProducts.sub = ownedProductsSub;
+    platformJSON.ownedKeys.app = ownedKeysApp;
+    platformJSON.ownedKeys.sub = ownedKeysSub;
   });
   return platforms;
 }
@@ -209,6 +214,7 @@ async function processUsersDB() {
   ghf.json.each(usersDB, function (userID, userData) {
     if (!ghf.is.jsonEmpty(userData)
       && ((userData?.__settings?.lastUpdate || 0) + ((24 * 60 * 60 * 1000) * 7) < Date.now()) // 7 days
+      && userData?.__settings?.visible !== false
     ) {
       console.log('Clear user - ', userID, ': ', ghf.json.parse(ghf.json.stringify(userData)));
       delete usersDB[userID];
@@ -327,6 +333,8 @@ function toggleLoading(value) {
     $('#indiegala-giveaways-toolbar-left-loading').hide();
     let giveawaysElems = $('.page-contents-list .items-list-col');
     $('#indiegala-giveaways-toolbar-left-count').attr('title', `${giveawaysElems.length} giveaways loaded`).html(giveawaysElems.length);
+    if ($('#igh-pagination').length === 0)
+      $('.pagination .page-link-cont.left:first').text(`${$('.page-contents-ajax-list .page-contents-list .items-list-col').length} of ${$('.pagination .page-link-cont.left:first').text()}`).attr('id', 'igh-pagination');
   }
   $('#indiegala-giveaways-toolbar-right-toggle-smart-visibility, #indiegala-giveaways-toolbar-right-toggle-all-giveaways-visibility').removeClass(removeClass).addClass(addClass);
 }
@@ -341,6 +349,7 @@ function updateGiveawayVisibility(giveawayID) {
     let visibility = $('#indiegala-giveaways-toolbar-right-toggle-all-giveaways-visibility').attr('data-all-giveaways-visibility');
     let smartVisibility = $('#indiegala-giveaways-toolbar-right-toggle-smart-visibility').attr('data-smart-visibility');
     let productVisibility = (giveawaysDB?.[giveawayID] ? (steam[giveawaysDB[giveawayID].product.type]?.[giveawaysDB[giveawayID].product.id]?.__settings?.visible ?? true) : true);
+    let ownerVisibility = (giveawaysDB?.[giveawayID] ? (usersDB[giveawaysDB[giveawayID].owner.id]?.__settings?.visible ?? true) : true);
     let el = $(`.indiegala-giveaway[data-giveaway-id="${giveawayID}"]`);
     $(el).show();
     if (visibility === 'off') {
@@ -348,6 +357,7 @@ function updateGiveawayVisibility(giveawayID) {
         || giveawaysDB[giveawayID]?.level > account.current_level
         || (giveawaysDB[giveawayID] !== undefined && !giveawaysDB[giveawayID].__settings.visible)
         || !productVisibility
+        || !ownerVisibility
         || $(el).find('.items-list-item-data-cont').length === 0
       ) { $(el).hide(); }
       if (smartVisibility === 'on' && el.length) {
@@ -436,8 +446,7 @@ async function toggleProductOwnership(giveaway, el) {
       mentionedPlatforms[0] !== 'steam'
       || (
         mentionedPlatforms[0] === 'steam'
-        && platform.steam.ownedProducts.app.length === 0
-        && platform.steam.ownedProducts.sub.length === 0
+        && platform.steam.metadata.failedRequest
       )
     )
   ) {
@@ -507,7 +516,23 @@ async function toggleProductVisibility(product, el) {
   }
 }
 async function toggleOwnerVisibility(giveawayID, el) {
-  
+  let ownerID = $(`.indiegala-giveaway[data-giveaway-id="${giveawayID}"]`).attr('data-owner-id');
+  if (usersDB?.[ownerID] !== undefined) {
+    let visibility = $(el).attr('data-owner-visibility');
+    let newVisibility = visibility === 'off' ? 'on' : 'off';
+    $(`.indiegala-giveaway[data-owner-id="${ownerID}"]`).each((i, gEl) => {
+      let ownerVisibilityBtn = $(gEl).find('.items-list-item-type-right-btns-owner-visibility');
+      if (visibility === 'off') {
+        $(ownerVisibilityBtn).find('i').removeClass('fa-user-times').addClass('fa-user');
+      } else {
+        $(ownerVisibilityBtn).find('i').removeClass('fa-user').addClass('fa-user-times');
+      }
+      $(ownerVisibilityBtn).attr('data-owner-visibility', newVisibility).attr('title', `[${newVisibility.toUpperCase()}] Owner visibility`)
+    });
+    usersDB[ownerID].__settings.visible = (newVisibility === 'on');
+    await ehf.storage.local.set('indiegalaUsers', usersDB);
+    updateAllGiveawaysVisibility();
+  }
 }
 async function getGiveawayData(giveaway) {
   let html = await ehf.fetch(giveaway.url);
@@ -633,7 +658,7 @@ async function getOwnerData(giveaway) {
       giveawayOwner = { ...{ reputation: '0', reputationCount: '+0 | -0', level: '0', giveawaysCreated: '0', __settings: { lastUpdate: Date.now(), visible: true, } }, ...giveawayOwner };
     } else {
       giveawayOwner = { ...giveawayOwner, ...usersDB[giveawaysDB[giveaway.id].owner.id] };
-      processOwner(giveaway);
+      // processOwner(giveaway);
     }
     ghf.json.value(giveawayOwner, '__settings.lastUpdate', Date.now());
     ghf.json.value(giveawayOwner, '__settings.visible', (usersDB?.[giveawaysDB[giveaway.id].owner.id]?.__settings?.visible ?? true));
@@ -671,8 +696,7 @@ function checkProductOwnership(giveaway) {
         mentionedPlatforms[0] !== 'steam'
         || (
           mentionedPlatforms[0] === 'steam'
-          && platform.steam.ownedProducts.app.length === 0
-          && platform.steam.ownedProducts.sub.length === 0
+          && platform.steam.metadata.failedRequest
         )
       )
     ) {
@@ -692,27 +716,34 @@ function checkProductVisibility(giveaway) {
   if (+giveaway.id > 0 && steam[giveaway.productType]?.[giveaway.productID] === undefined) {
     checkProductVisibility(giveaway);
   } else if (+giveaway.id > 0 && steam[giveaway.productType]?.[giveaway.productID] !== undefined) {
-    let el = $(`.indiegala-giveaway[data-giveaway-id="${giveaway.id}"]`);
-
-    let productVisibilityBtn = $(el).find('.items-list-item-type-right-btns-product-visibility');
-    let visible = steam[giveaway.productType][giveaway.productID].__settings.visible;
-    let visibility = visible ? 'on' : 'off';
-    if (visibility === 'off') {
-      $(productVisibilityBtn).find('i').removeClass('fa-bell-o').addClass('fa-bell-slash-o');
-    } else {
-      $(productVisibilityBtn).find('i').removeClass('fa-bell-slash-o').addClass('fa-bell-o');
-    }
-    $(productVisibilityBtn).attr('data-product-visibility', visibility).attr('title', `[${visibility.toUpperCase()}] Product visibility`).show();
+    $(`.indiegala-giveaway[data-product-type="${giveaway.productType}"][data-product-id="${giveaway.productID}"]`).each(async function (i, el) {
+      let productVisibilityBtn = $(el).find('.items-list-item-type-right-btns-product-visibility');
+      let visible = steam[giveaway.productType][giveaway.productID].__settings.visible;
+      let visibility = visible ? 'on' : 'off';
+      if (visibility === 'off') {
+        $(productVisibilityBtn).find('i').removeClass('fa-bell-o').addClass('fa-bell-slash-o');
+      } else {
+        $(productVisibilityBtn).find('i').removeClass('fa-bell-slash-o').addClass('fa-bell-o');
+      }
+      $(productVisibilityBtn).attr('data-product-visibility', visibility).attr('title', `[${visibility.toUpperCase()}] Product visibility`).show();
+    });
   }
 }
 function checkOwnerVisibility(giveaway) {
-  if (+giveaway.id > 0 && giveawaysDB[giveaway.id] === undefined) {
+  if (+giveaway.id > 0 && (giveawaysDB[giveaway.id] === undefined || usersDB[giveawaysDB[giveaway.id].owner.id] === undefined)) {
     checkOwnerVisibility(giveaway);
-  } else if (+giveaway.id > 0 && giveawaysDB[giveaway.id] !== undefined) {
-    let el = $(`.indiegala-giveaway[data-giveaway-id="${giveaway.id}"]`);
-
-    let ownerVisibilityBtn = $(el).find('.items-list-item-type-right-btns-owner-visibility');
-    // let visible = steam[giveaway.productType][giveaway.productID].__settings.visible;
+  } else if (+giveaway.id > 0 && giveawaysDB[giveaway.id] !== undefined && usersDB[giveawaysDB[giveaway.id].owner.id] !== undefined) {
+    $(`.indiegala-giveaway[data-owner-id="${giveawaysDB[giveaway.id].owner.id}"]`).each(async function (i, el) {
+      let ownerVisibilityBtn = $(el).find('.items-list-item-type-right-btns-owner-visibility');
+      let visible = usersDB[giveawaysDB[giveaway.id].owner.id].__settings.visible;
+      let visibility = visible ? 'on' : 'off';
+      if (visibility === 'off') {
+        $(ownerVisibilityBtn).find('i').removeClass('fa-user').addClass('fa-user-times');
+      } else {
+        $(ownerVisibilityBtn).find('i').removeClass('fa-user-times').addClass('fa-user');
+      }
+      $(ownerVisibilityBtn).attr('data-owner-visibility', visibility).attr('title', `[${visibility.toUpperCase()}] Owner visibility`).show();
+    });
   }
 }
 function colorGiveaway(giveaway) {
@@ -778,6 +809,8 @@ function processGiveaway(giveaway, force = {}) {
     // Giveaway description && mentioned platforms && feudalife in description
     $(el).find('.items-list-item-indicators-icons-description').attr('title', giveawayData.description);
     if ($(el).attr('data-mentioned-platforms') === undefined) {
+      $(el).find('.items-list-item-indicators-icons-description .platform-badge').remove();
+      $(el).find('.items-list-item-indicators-icons-description .feudalife-badge').remove();
       let mentionedPlatforms = '';
       ghf.json.each(platform, function (platformKey, platformJSON) {
         if (platformKey !== 'steam'
@@ -823,8 +856,6 @@ function processGiveaway(giveaway, force = {}) {
       checkProductOwnership(giveaway);
       // Product visibility btn
       checkProductVisibility(giveaway);
-      // Owner visibility btn
-      checkOwnerVisibility(giveaway);
     }
 
     // Giveaway color
@@ -915,6 +946,8 @@ function processProduct(giveaway, force = {}) {
 
       // Product base game badges
       if (appType === 'dlc' || appType === 'music') {
+        $(el).find('.items-list-item-indicators-icons-product .product-base-game-badge').remove();
+        $(el).find('.items-list-item-indicators-icons-product .product-base-game-owned-badge').remove();
         let baseGameID = productData?.data?.fullgame?.appid;
         let baseGameData = steam.app[baseGameID];
         let baseGameName = productData?.data?.fullgame?.name || baseGameData?.data?.name || '';
@@ -966,6 +999,9 @@ function processProduct(giveaway, force = {}) {
       // Product package
       let packageInfo = { platform: {}, title: { ownedApps: '', ownedKeys: '', apps: '', }, };
       if (appType === 'package') {
+        $(el).find('.items-list-item-indicators-icons-product .package-owned-apps-badge').remove();
+        $(el).find('.items-list-item-indicators-icons-product .package-owned-keys-badge').remove();
+        $(el).find('.items-list-item-indicators-icons-product .package-apps-badge').remove();
         ghf.json.each(platform, function (platformKey, platformJSON) {
           if (packageInfo.platform[platformKey] === undefined) { packageInfo.platform[platformKey] = { ownedApps: [], ownedKeys: [], }; };
 
@@ -1097,7 +1133,6 @@ function processProduct(giveaway, force = {}) {
       $(el).find('.items-list-item-type-left-btns-product-refresh').show();
       checkProductOwnership(giveaway);
       checkProductVisibility(giveaway);
-      checkOwnerVisibility(giveaway);
 
       //  Giveaway color
       colorGiveaway({
@@ -1153,6 +1188,9 @@ function processOwner(giveaway) {
 
     if ((usersDB[ownerID].__settings.lastUpdate + (24 * 60 * 60 * 1000)) < Date.now()) { // 24H
       getOwnerData(giveaway);
+    } else {
+      // Owner visibility btn
+      checkOwnerVisibility(giveaway);
     }
   }
 }
@@ -1245,7 +1283,7 @@ function checkGiveaways(cards) {
 
       // Action buttons
       let productRefreshBtn = `
-        <a class="items-list-item-type-left-btns-product-refresh igh-text-white" style="display:none;" href="javascript:;" title="Refresh Product info">
+        <a class="items-list-item-type-left-btns-product-refresh igh-text-white" style="display:none;" href="javascript:;" title="Refresh product info">
           <i class="fa fa-refresh"></i>
         </a>`;
       let productKeyOwnershipBtn = `

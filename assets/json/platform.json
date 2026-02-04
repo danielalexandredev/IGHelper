@@ -1,18 +1,22 @@
 {
   "steam": {
     "name": "Steam", "keyWords": [], "gradient": ["#1b2838", "#171a21", "#2a475e", "#66c0f4"],
-    "ownedKeys": { "app": [], "sub": [] }, "ownedProducts": { "app": [], "sub": [] }
+    "ownedKeys": { "app": [], "sub": [] }, "ownedProducts": { "app": [], "sub": [] },
+    "iconUrl": "", "metadata": {}
   },
   "gog": {
     "name": "GOG", "keyWords": ["gog"], "gradient": ["#4b0082", "#6a0dad", "#9d47dc", "#d3a4ff"],
-    "ownedKeys": { "app": [], "sub": [] }, "ownedProducts": { "app": [], "sub": [] }
+    "ownedKeys": { "app": [], "sub": [] }, "ownedProducts": { "app": [], "sub": [] },
+    "iconUrl": "", "metadata": {}
   },
   "legacy-games": {
     "name": "Legacy Games", "keyWords": ["legacy games", "legacygames"], "gradient": ["#f57c00", "#d32f2f", "#1976d2"],
-    "ownedKeys": { "app": [], "sub": [] }, "ownedProducts": { "app": [], "sub": [] }
+    "ownedKeys": { "app": [], "sub": [] }, "ownedProducts": { "app": [], "sub": [] },
+    "iconUrl": "", "metadata": {}
   },
   "xbox": {
     "name": "Xbox", "keyWords": ["xbox", "microsoft"], "gradient": ["#0E5A0E", "#107C11", "#A3D900"],
-    "ownedKeys": { "app": [], "sub": [] }, "ownedProducts": { "app": [], "sub": [] }
+    "ownedKeys": { "app": [], "sub": [] }, "ownedProducts": { "app": [], "sub": [] },
+    "iconUrl": "", "metadata": {}
   }
 }

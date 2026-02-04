@@ -1,8 +1,18 @@
-#main-menu-galasilver {
+.igh-menu ul li {
+  margin-left: 20px !important;
+}
+.igh-menu ul li:first-child {
+  margin-left: 0 !important;
+}
+#igh-galasilver,
+#igh-steam-login-status {
   color: white;
 }
-#main-menu-galasilver span {
+#igh-galasilver span {
   padding: 4px 8px;
   border: 2px solid white;
   border-radius: 25px;
+}
+#igh-steam-login-status i {
+  font-size: 18px;
 }

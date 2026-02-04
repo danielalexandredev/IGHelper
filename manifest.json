@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "IG Helper",
-  "version": "1.0.0",
+  "version": "3.2.7",
   "description": "Indiegala Helper",
   "icons": {
     "16": "assets/images/igh-icon/icon_16.ico",
@@ -24,7 +24,7 @@
       "matches": ["*://*.indiegala.com/*"],
       "js": [
         "assets/js/jquery/3.7.1/jquery.min.js", 
-        "assets/js/general-helper-functions.js", 
+        "assets/js/general-helper-functions.js",
         "assets/js/extension-helper-functions.js"
       ],
       "css": ["assets/css/igh.css"],
@@ -32,6 +32,16 @@
     },
     {
 			"matches": ["*://*.indiegala.com/*"],
+			"js": ["pages/indiegala/general.js"],
+      "run_at": "document_end"
+		},
+    {
+      "matches": ["*://*.indiegala.com/*"],
+      "exclude_matches": [
+        "*://forums.indiegala.com/*",
+        "*://freebies.indiegala.com/*",
+        "*://docs.indiegala.com/*"
+      ],
 			"js": ["pages/indiegala/index.js"],
       "css": ["pages/indiegala/stylesheet.css"],
       "run_at": "document_end"
@@ -55,6 +65,7 @@
       "matches": [ "*://*.indiegala.com/*" ],
       "resources": [
         "assets/json/platform.json",
+        "assets/json/settings.json",
         "assets/images/icons/feudalife.png",
         "assets/images/icons/steamdb.svg",
         "assets/images/icons/indiegala.ico",

@@ -7,6 +7,7 @@ var indiegala_giveaways_card = {
   loading: true,
   interval: { indiegala: null, init: null, }
 };
+var settings = {};
 var account = {
   id: undefined, username: undefined, link: '', sessionid: '',
   current_level: 0, points_to_next_level: '-', experience_bar_width: 0, status: 'ok', current_points: 0, current_floor: 5000
@@ -32,7 +33,7 @@ async function initGiveawaysCard() {
 
   await new Promise(resolve => {
     indiegala_giveaways_card.interval.indiegala = setInterval(function () {
-      if (ghf.is.function(getAccountInfo)) {
+      if (typeof indiegala !== 'undefined') {
         clearInterval(indiegala_giveaways_card.interval.indiegala);
         resolve();
       }
@@ -40,12 +41,16 @@ async function initGiveawaysCard() {
   });
   
   account = await getAccountInfo();
-  if (account && account?.sessionid) {
-    platform = await getPlatformsOwnedProducts();
-    giveawaysDB = await ehf.storage.local.get('indiegalaGiveaways');
-    usersDB = await ehf.storage.local.get('indiegalaUsers');
-    steam.app = await ehf.storage.local.get('steamApps');
-    steam.sub = await ehf.storage.local.get('steamSubs');
+  if (typeof account !== 'undefined' && account?.sessionid) {
+    settings = await getSettings();
+    await new Promise(async (resolve) => {
+      platform = await getPlatformsOwnedProducts();
+      giveawaysDB = await ehf.storage.local.get('indiegalaGiveaways');
+      usersDB = await ehf.storage.local.get('indiegalaUsers');
+      steam.app = await ehf.storage.local.get('steamApps');
+      steam.sub = await ehf.storage.local.get('steamSubs');
+      resolve();
+    });
 
     await new Promise(resolve => {
       indiegala_giveaways_card.interval.init = setInterval(function () {
@@ -70,14 +75,13 @@ async function resetGiveaways() {
   $('.card-contents-loading').show();
   indiegala_giveaways_card.loaded = false;
   indiegala_giveaways_card.loading = true;
-  if (indiegala_giveaways_card.interval.indiegala !== null) {
-    clearInterval(indiegala_giveaways_card.interval.indiegala);
-    indiegala_giveaways_card.interval.indiegala = null;
-  }
-  if (indiegala_giveaways_card.interval.init !== null) {
-    clearInterval(indiegala_giveaways_card.interval.init);
-    indiegala_giveaways_card.interval.init = null;
-  }
+
+  ghf.json.each(indiegala_giveaways_card.interval, function (key, value) {
+    if (value !== null) {
+      clearInterval(indiegala.interval[key]);
+      value = null;
+    }
+  });
   account = {
     id: undefined, username: undefined, link: '', sessionid: '',
     current_level: 0, points_to_next_level: '-', experience_bar_width: 0, status: 'ok', current_points: 0, current_floor: 5000
@@ -95,14 +99,32 @@ async function getPlatformsOwnedProducts() {
     let ownedProductsSub = await ehf.storage.local.get(`${platformKey}_ownedProductsSub`, []);
     let ownedKeysApp = await ehf.storage.local.get(`${platformKey}_ownedKeysApp`, []);
     let ownedKeysSub = await ehf.storage.local.get(`${platformKey}_ownedKeysSub`, []);
-    if (platformKey === 'steam') {
-      let userData = await ehf.fetch('https://store.steampowered.com/dynamicstore/userdata/', { credentials: 'include' });
-      if (userData.rgOwnedApps.length > 0 || userData.rgOwnedPackages.length > 0) {
-        ownedProductsApp = userData.rgOwnedApps;
-        ownedProductsSub = userData.rgOwnedPackages;
-        ehf.storage.local.set(`${platformKey}_ownedProductsApp`, ownedProductsApp);
-        ehf.storage.local.set(`${platformKey}_ownedProductsSub`, ownedProductsSub);
-      }
+    if (
+      platformKey === 'steam'
+      && await checkSteamLogin()
+      && (settings?.lastSteamOwnedProductsRequest || 0) + (30 * 60 * 1000) < Date.now()) // 30m
+    {
+      settings.lastSteamOwnedProductsRequest = Date.now();
+      await setSettings(settings);
+      await new Promise(async (resolve) => {
+        await ehf.fetch('https://store.steampowered.com/dynamicstore/userdata/', { credentials: 'include' })
+          .then(async (userData) => {
+            if (userData.rgOwnedApps.length > 0 || userData.rgOwnedPackages.length > 0) {
+              ownedProductsApp = userData.rgOwnedApps;
+              ownedProductsSub = userData.rgOwnedPackages;
+              await ehf.storage.local.set(`${platformKey}_ownedProductsApp`, ownedProductsApp);
+              await ehf.storage.local.set(`${platformKey}_ownedProductsSub`, ownedProductsSub);
+            } else {
+              platformJSON.metadata.failedRequest = true;
+            }
+          }).finally(() => { resolve(); });
+      });
+    } else if (
+      platformKey === 'steam' 
+      && (!(await checkSteamLogin()) 
+        || (ownedProductsApp.length === 0 && ownedProductsSub.length === 0))
+    ) {
+      platformJSON.metadata.failedRequest = true;
     }
     platformJSON.ownedProducts.app = ownedProductsApp;
     platformJSON.ownedProducts.sub = ownedProductsSub;
@@ -149,8 +171,7 @@ async function toggleProductOwnership(giveaway, el) {
       mentionedPlatforms[0] !== 'steam'
       || (
         mentionedPlatforms[0] === 'steam'
-        && platform.steam.ownedProducts.app.length === 0
-        && platform.steam.ownedProducts.sub.length === 0
+        && platform.steam.metadata.failedRequest
       )
     )
   ) {
@@ -330,8 +351,7 @@ function checkProductOwnership(giveaway) {
         mentionedPlatforms[0] !== 'steam'
         || (
           mentionedPlatforms[0] === 'steam'
-          && platform.steam.ownedProducts.app.length === 0
-          && platform.steam.ownedProducts.sub.length === 0
+          && platform.steam.metadata.failedRequest
         )
       )
     ) {
@@ -412,6 +432,8 @@ function processGiveaway(giveaway, force = {}) { // TODO DA
     //  Giveaway description && mentioned platforms && feudalife in description
     $('.card-indicators-icons-description').attr('title', giveawayData.description);
     if ($('.card-page').attr('data-mentioned-platforms') === undefined) {
+      $('.card-indicators-icons-description .platform-badge').remove();
+      $('.card-indicators-icons-description .feudalife-badge').remove();
       let mentionedPlatforms = '';
       ghf.json.each(platform, function (platformKey, platformJSON) {
         if (platformKey !== 'steam'
@@ -441,7 +463,7 @@ function processGiveaway(giveaway, force = {}) { // TODO DA
     if (steam[giveaway.productType]?.[giveaway.productID] !== undefined) {
       $('.card-indicators-btns-product-refresh').show();
       // Product ownership btn
-      checkProductOwnership(giveaway);
+      // checkProductOwnership(giveaway);
     }
     
     //  Giveaway color
@@ -529,6 +551,8 @@ async function processProduct(giveaway, force = {}) {
 
     //  Product base game badges
     if (appType === 'dlc' || appType === 'music') {
+      $('.card-indicators-icons-product .product-base-game-badge').remove();
+      $('.card-indicators-icons-product .product-base-game-owned-badge').remove();
       let baseGameID = productData?.data?.fullgame?.appid;
       let baseGameData = steam.app[baseGameID];
       let baseGameName = productData?.data?.fullgame?.name || baseGameData?.data?.name || '';
@@ -578,6 +602,9 @@ async function processProduct(giveaway, force = {}) {
     //  Product package
     let packageInfo = { platform: {}, title: { ownedApps: '', ownedKeys: '', apps: '', }, };
     if (appType === 'package') {
+      $('.card-indicators-icons-product .package-owned-apps-badge').remove();
+      $('.card-indicators-icons-product .package-owned-keys-badge').remove();
+      $('.card-indicators-icons-product .package-apps-badge').remove();
       ghf.json.each(platform, function (platformKey, platformJSON) {
         if (packageInfo.platform[platformKey] === undefined) { packageInfo.platform[platformKey] = { ownedApps: [], ownedKeys: [], }; };
 
@@ -648,7 +675,7 @@ async function processProduct(giveaway, force = {}) {
     //  Products owned in platforms
     $('.card-page').removeAttr('data-owned-platforms');
     $('.card-indicators-platforms').remove();
-    $('.card-indicators-btns-key-ownership').show();
+    // $('.card-indicators-btns-key-ownership').show();
     let ownedPlatforms = '';
     let ownedPlatformsHtml = '';
     ghf.json.each(platform, function (platformKey, platformJSON) {
@@ -700,7 +727,7 @@ async function processProduct(giveaway, force = {}) {
 
     //  Giveaway btns
     $('.card-indicators-btns-product-refresh').show();
-    checkProductOwnership(giveaway);
+    // checkProductOwnership(giveaway);
 
     //  Giveaway color
     colorGiveaway({
