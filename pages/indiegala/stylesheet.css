@@ -1,3 +1,6 @@
+.igh-menu ul {
+  list-style-type: none;
+}
 .igh-menu ul li {
   margin-left: 20px !important;
 }

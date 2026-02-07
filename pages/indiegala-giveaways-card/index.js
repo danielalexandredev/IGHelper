@@ -8,10 +8,7 @@ var indiegala_giveaways_card = {
   interval: { indiegala: null, init: null, }
 };
 var settings = {};
-var account = {
-  id: undefined, username: undefined, link: '', sessionid: '',
-  current_level: 0, points_to_next_level: '-', experience_bar_width: 0, status: 'ok', current_points: 0, current_floor: 5000
-};
+var account = {};
 var platform = {};
 var giveawaysDB = {};
 var usersDB = {};
@@ -26,11 +23,12 @@ initGiveawaysCard();
 //  | FUNCTIONS |
 //  *-----------*
 async function initGiveawaysCard() {
+  await resetGiveaways();
   $('.card-page').addClass('relative');
   if ($('.card-contents-loading').length === 0)
     $('.card-page').append(`<div class="card-contents-loading"><i class="fa fa-spinner fa-pulse"></i></div>`);
-  await resetGiveaways();
 
+  // Wait for indiegala variable
   await new Promise(resolve => {
     indiegala_giveaways_card.interval.indiegala = setInterval(function () {
       if (typeof indiegala !== 'undefined') {
@@ -39,36 +37,48 @@ async function initGiveawaysCard() {
       }
     }, 200)
   });
-  
+
   account = await getAccountInfo();
-  if (typeof account !== 'undefined' && account?.sessionid) {
+  if (typeof account !== 'undefined' && ghf.is.json(account) && account?.sessionid) {
     settings = await getSettings();
     await new Promise(async (resolve) => {
-      platform = await getPlatformsOwnedProducts();
       giveawaysDB = await ehf.storage.local.get('indiegalaGiveaways');
       usersDB = await ehf.storage.local.get('indiegalaUsers');
       steam.app = await ehf.storage.local.get('steamApps');
       steam.sub = await ehf.storage.local.get('steamSubs');
+      platform = await getPlatformsOwnedProducts();
       resolve();
     });
 
-    await new Promise(resolve => {
-      indiegala_giveaways_card.interval.init = setInterval(function () {
-        if ($('.card-title > a').length > 0 && !ghf.is.jsonEmpty(platform)) {
-          clearInterval(indiegala_giveaways_card.interval.init);
-          resolve();
-        }
-      }, 200)
-    });
-
-    setTimeout(() => {
-      checkGiveaway();
-    }, 700);
+    indiegala_giveaways_card.interval.init = setInterval(function () {
+      if (!ghf.is.jsonEmpty(platform)
+        && !ghf.is.jsonEmpty(settings)
+        && $('.card-title > a').length > 0
+        && $('.card-contents-loading').length > 0
+      ) {
+        clearInterval(indiegala_giveaways_card.interval.init);
+        setTimeout(function () {
+          $('.card-contents-loading').hide();
+          indiegala_giveaways_card.loading = false;
+          indiegala_giveaways_card.loaded = true;
+          checkGiveaway();
+        }, 500)
+      }
+    }, 200)
   } else {
-    $('.card-contents-loading').hide();
+    indiegala_giveaways_card.interval.init = setInterval(function () {
+      if ($('.card-title > a').length > 0
+        && $('.card-contents-loading').length > 0
+      ) {
+        clearInterval(indiegala_giveaways_card.interval.init);
+        setTimeout(function () {
+          $('.card-contents-loading').hide();
+          indiegala_giveaways_card.loading = false;
+          indiegala_giveaways_card.loaded = true;
+        }, 500)
+      }
+    }, 200)
   }
-  indiegala_giveaways_card.loading = false;
-  indiegala_giveaways_card.loaded = true;
 }
 
 async function resetGiveaways() {
@@ -82,10 +92,7 @@ async function resetGiveaways() {
       value = null;
     }
   });
-  account = {
-    id: undefined, username: undefined, link: '', sessionid: '',
-    current_level: 0, points_to_next_level: '-', experience_bar_width: 0, status: 'ok', current_points: 0, current_floor: 5000
-  };
+  account = {};
   platform = {};
   giveawaysDB = {};
   usersDB = {};
@@ -116,6 +123,7 @@ async function getPlatformsOwnedProducts() {
               await ehf.storage.local.set(`${platformKey}_ownedProductsSub`, ownedProductsSub);
             } else {
               platformJSON.metadata.failedRequest = true;
+              updateSteamLoginIndicator({ status: 'warning', tooltip: '🟡 There was a problem loading your owned Steam products', });
             }
           }).finally(() => { resolve(); });
       });
@@ -125,6 +133,7 @@ async function getPlatformsOwnedProducts() {
         || (ownedProductsApp.length === 0 && ownedProductsSub.length === 0))
     ) {
       platformJSON.metadata.failedRequest = true;
+      updateSteamLoginIndicator({ status: 'warning', tooltip: '🟡 There was a problem loading your owned Steam products', });
     }
     platformJSON.ownedProducts.app = ownedProductsApp;
     platformJSON.ownedProducts.sub = ownedProductsSub;
@@ -315,7 +324,7 @@ async function getOwnerData(giveaway) {
     let giveawayOwner = ghf.json.parse(ghf.json.stringify(giveawayData.owner));
     
     if (usersDB[giveawaysDB[giveaway.id].owner.id] === undefined) {
-      giveawayOwner = { ...{ reputation: '0', reputationCount: '+0 | -0', level: '0', giveawaysCreated: '0', __settings: { lastUpdate: Date.now(), visible: true, } }, ...giveawayOwner };
+      giveawayOwner = { ...{ status: 'active', reputation: '0', reputationCount: '+0 | -0', level: '0', giveawaysCreated: '0', __settings: { lastUpdate: Date.now(), visible: true, } }, ...giveawayOwner };
     } else {
       giveawayOwner = { ...giveawayOwner, ...usersDB[giveawaysDB[giveaway.id].owner.id] };
       processOwner(giveaway);
@@ -324,11 +333,21 @@ async function getOwnerData(giveaway) {
     ghf.json.value(giveawayOwner, '__settings.visible', (usersDB?.[giveawaysDB[giveaway.id].owner.id]?.__settings?.visible ?? true));
 
     if (giveawayOwner.url !== '') {
-      let html = await ehf.fetch(giveawayOwner.url);
-      giveawayOwner.reputation = $(html).find('.user-card-giveaways .user-card-reputation').html();
-      giveawayOwner.reputationCount = $(html).find('.user-card-giveaways .user-card-reputation-count').html();
-      giveawayOwner.level = $(html).find('.user-card-giveaways .user-card-body-col:nth-child(2) .user-card-body-content').html();
-      giveawayOwner.giveawaysCreated = $(html).find('.user-card-giveaways .user-card-body-sep ~ .user-card-body-col-left:first .user-card-body-content').html();
+      let html = await ehf.fetch(giveawayOwner.url).catch(() => { return 'removed' });
+      try {
+        if (html === 'removed') {
+          giveawayOwner.status = 'removed';
+        } else {
+          giveawayOwner.status = $(html).find('.user-card-status').html();
+          giveawayOwner.reputation = $(html).find('.user-card-giveaways .user-card-reputation').html();
+          giveawayOwner.reputationCount = $(html).find('.user-card-giveaways .user-card-reputation-count').html();
+          giveawayOwner.level = $(html).find('.user-card-giveaways .user-card-body-col:nth-child(2) .user-card-body-content').html();
+          giveawayOwner.giveawaysCreated = $(html).find('.user-card-giveaways .user-card-body-sep ~ .user-card-body-col-left:first .user-card-body-content').html();
+        }
+      } catch (e) {
+        console.error('getOwnerData id:', giveaway.id, '; error: ', e);
+        getOwnerData(giveaway);
+      }
     } else {
       giveawayOwner.level = '';
     }
@@ -765,8 +784,10 @@ function processOwner(giveaway) {
                           #C10015 ${reputationPercentagePositive}% ${reputationPercentagePositive+reputationPercentageNegative}%,
                           #212121 ${reputationPercentagePositive+reputationPercentageNegative}% 100%
                         `;
+      let status = ownerData.status;
+      let statusIcon = (status === 'active' ? '🟢' : status === 'banned' ? '🔴' : status === 'removed' ? '⚫' : '⚪');
       $(`.card-indicators-icons-owner`)
-        .attr('title', `Username: ${ownerData.name}\nLevel: ${ownerData.level}\nGiveaways created: ${giveawaysCreated}\n👍: ${reputationCountPositive} (${reputationPercentagePositive}%)\n👎: ${reputationCountNegative} (${reputationPercentageNegative}%)\n❔: ${reputationCountUnknown} (${reputationPercentageUnknown}%)`);
+        .attr('title', `Username: ${ownerData.name}\nLevel: ${ownerData.level}\nStatus: ${statusIcon} ${ghf.camelize(status, { upperCamelCase: true })}\nGiveaways created: ${giveawaysCreated}\n👍: ${reputationCountPositive} (${reputationPercentagePositive}%)\n👎: ${reputationCountNegative} (${reputationPercentageNegative}%)\n❔: ${reputationCountUnknown} (${reputationPercentageUnknown}%)`);
     }
     $(`.card-indicators-icons-owner`).css('background', reputationBorder);
     if (!!ownerData.level) {

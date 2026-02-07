@@ -5,14 +5,18 @@ console.log('[IG Helper Extension] indiegala-giveaways');
 var indiegala_giveaways = {
   loaded: false,
   loading: true,
-  interval: { indiegala: null, init_giveaways: null, init_giveawaysCurtain: null, init_giveawaysCarousel: null, },
+  interval: {
+    indiegala: null,
+    init_giveaways: null,
+    init_giveawaysCarousel: null,
+    init_giveawaysCurtain: null,
+    init_giveawaysMenu: null,
+    init_giveawaysAjax: null
+  },
   observer: { curtain: undefined, results: undefined, },
 };
 var settings = {};
-var account = {
-  id: undefined, username: undefined, link: '', sessionid: '',
-  current_level: 0, points_to_next_level: '-', experience_bar_width: 0, status: 'ok', current_points: 0, current_floor: 5000
-};
+var account = {};
 var platform = {};
 var giveawaysDB = {};
 var usersDB = {};
@@ -31,7 +35,7 @@ initGiveaways();
 //  *-----------*
 async function initGiveaways() {
   await resetGiveaways();
-
+  
   // Carousel
   indiegala_giveaways.interval.init_giveawaysCarousel = setInterval(function () {
     $('.carousel, .carousel-control-prev, .carousel-control-prev, .page-slider-title').hide();
@@ -43,21 +47,43 @@ async function initGiveaways() {
     }
   }, 200);
 
-  await new Promise(resolve => {
-    indiegala_giveaways.interval.init_giveawaysCurtain = setInterval(function () {
-      if ($('.page-contents-ajax-list-cover').length > 0) {
-        clearInterval(indiegala_giveaways.interval.init_giveawaysCurtain);
-        resolve();
-      }
-    }, 200)
-  });
-  $('.page-contents-ajax-list-cover').html('<div class="page-contents-ajax-list-cover-loading"><i class="fa fa-spinner fa-pulse"></i></div>');
-  $([document.documentElement, document.body]).animate({
-    scrollTop: $(".page-contents-list-menu-sort-col-xs-auto").offset().top - 80
-  }, 200);
-  $('.page-contents-ajax-list-cover').css('display', 'block');
-  $('.page-contents-ajax-list').css('opacity', '0.25');
+  // Curtain
+  indiegala_giveaways.interval.init_giveawaysCurtain = setInterval(function () {
+    if ($('.page-contents-ajax-list-cover').length > 0) {
+      clearInterval(indiegala_giveaways.interval.init_giveawaysCurtain);
+      $('.page-contents-ajax-list-cover')
+        .html('<div class="page-contents-ajax-list-cover-loading"><i class="fa fa-spinner fa-pulse"></i></div>');
+      
+      $([document.documentElement, document.body]).animate({
+        scrollTop: $(".page-contents-list-menu-sort-col-xs-auto").offset().top - 80
+      }, 200);
+      $('.page-contents-ajax-list-cover').css('display', 'block');
+      $('.page-contents-ajax-list').css('opacity', '0.25');
 
+      const curtainEl = document.getElementsByClassName("page-contents-ajax-list-cover")[0];
+      indiegala_giveaways.observer.curtain = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+          if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+            if ($(curtainEl).is(":visible")) {
+              toggleLoading(true);
+            } else {
+              toggleLoading(false);
+              if (typeof account !== 'undefined'
+                && ghf.is.json(account)
+                && account?.sessionid
+                && indiegala_giveaways.loaded
+              ) {
+                checkGiveaways();
+              }
+            }
+          }
+        });
+      });
+      indiegala_giveaways.observer.curtain.observe(curtainEl, { attributes: true });
+    }
+  }, 200)
+
+  // Wait for indiegala variable
   await new Promise(resolve => {
     indiegala_giveaways.interval.indiegala = setInterval(function () {
       if (typeof indiegala !== 'undefined') {
@@ -68,10 +94,29 @@ async function initGiveaways() {
   });
 
   account = await getAccountInfo();
-  if (typeof account !== 'undefined' && account.sessionid) {
+  if (typeof account !== 'undefined' && ghf.is.json(account) && account?.sessionid) {
+    // Menu
+    indiegala_giveaways.interval.init_giveawaysMenu = setInterval(function () {
+      if ($('.page-contents-list-menu-sort-col-xs-auto').length > 0) {
+        clearInterval(indiegala_giveaways.interval.init_giveawaysMenu);
+        createGiveawaysToolbarElements();
+      }
+    }, 200);
+
+    // Ajax
+    indiegala_giveaways.interval.init_giveawaysAjax = setInterval(function () {
+      if ($('.page-contents-ajax-results').length > 0) {
+        clearInterval(indiegala_giveaways.interval.init_giveawaysAjax);
+        const resultsEl = document.getElementsByClassName("page-contents-ajax-results")[0];
+        indiegala_giveaways.observer.results = new MutationObserver(() => {
+          checkGiveaways('.page-contents-ajax-results .page-contents-list .items-list-col');
+        });
+        indiegala_giveaways.observer.results.observe(resultsEl, { childList: true, subtree: true, attributes: true, characterData: true });
+      }
+    }, 200);
+
     settings = await getSettings();
     await new Promise(async (resolve) => {
-      platform = await getPlatformsOwnedProducts();
       giveawaysDB = await ehf.storage.local.get('indiegalaGiveaways');
       await processGiveawaysDB();
       usersDB = await ehf.storage.local.get('indiegalaUsers');
@@ -80,54 +125,46 @@ async function initGiveaways() {
       steam.sub = await ehf.storage.local.get('steamSubs');
       await processSteamDB('steamApps');
       await processSteamDB('steamSubs');
+      platform = await getPlatformsOwnedProducts();
       resolve();
     });
 
-    await new Promise(resolve => {
-      indiegala_giveaways.interval.init_giveaways = setInterval(function () {
-        if (
-          indiegala?.loaded === true
-          && !ghf.is.jsonEmpty(platform)
-          && $('.page-contents-list-menu-sort-col-xs-auto').length > 0
-          && $('.page-contents-ajax-list').length > 0
-          && $('.page-contents-list .items-list-col').length > 0
-        ) {
-          clearInterval(indiegala_giveaways.interval.init_giveaways);
-          resolve();
-        }
-      }, 200);
-    });
-
-    createGiveawaysToolbarElements();
-
-    const curtainEl = document.getElementsByClassName("page-contents-ajax-list-cover")[0];
-    indiegala_giveaways.observer.curtain = new MutationObserver(mutations => {
-      mutations.forEach(mutation => {
-        if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
-          if ($(curtainEl).is(":visible")) {
-            toggleLoading(true);
-          } else {
-            toggleLoading(false);
-            if (indiegala_giveaways.loaded)
-              checkGiveaways();
-          }
-        }
-      });
-    });
-    indiegala_giveaways.observer.curtain.observe(curtainEl, { attributes: true });
-
-    const resultsEl = document.getElementsByClassName("page-contents-ajax-results")[0];
-    indiegala_giveaways.observer.results = new MutationObserver(() => {
-      checkGiveaways('.page-contents-ajax-results .page-contents-list .items-list-col');
-    });
-    indiegala_giveaways.observer.results.observe(resultsEl, { childList: true, subtree: true, attributes: true, characterData: true });
+    indiegala_giveaways.interval.init_giveaways = setInterval(function () {
+      if (
+        !ghf.is.jsonEmpty(platform)
+        && !ghf.is.jsonEmpty(settings)
+        && $('.page-contents-list-menu-sort-col-xs-auto').length > 0
+        && $('.page-contents-ajax-list-cover').length > 0
+        && $('.page-contents-ajax-list').length > 0
+        && $('.page-contents-list .items-list-col').length > 0
+      ) {
+        clearInterval(indiegala_giveaways.interval.init_giveaways);
+        setTimeout(function () {
+          $('.page-contents-ajax-list-cover').hide();
+          $('.page-contents-ajax-list').css('opacity', '1');
+          indiegala_giveaways.loading = false;
+          indiegala_giveaways.loaded = true;
+        }, 500)
+      }
+    }, 200);
+  } else {
+    indiegala_giveaways.interval.init_giveaways = setInterval(function () {
+      if (
+        $('.page-contents-list-menu-sort-col-xs-auto').length > 0
+        && $('.page-contents-ajax-list-cover').length > 0
+        && $('.page-contents-ajax-list').length > 0
+        && $('.page-contents-list .items-list-col').length > 0
+      ) {
+        clearInterval(indiegala_giveaways.interval.init_giveaways);
+        setTimeout(function () {
+          $('.page-contents-ajax-list-cover').hide();
+          $('.page-contents-ajax-list').css('opacity', '1');
+          indiegala_giveaways.loading = false;
+          indiegala_giveaways.loaded = true;
+        }, 500)
+      }
+    }, 200);
   }
-  setTimeout(() => {
-    $('.page-contents-ajax-list-cover').hide();
-    $('.page-contents-ajax-list').css('opacity', '1');
-    indiegala_giveaways.loading = false;
-    indiegala_giveaways.loaded = true;
-  }, 700);
 }
 
 async function resetGiveaways() {
@@ -144,10 +181,7 @@ async function resetGiveaways() {
     if (value !== undefined)
       indiegala_giveaways.observer[key].disconnect();
   });
-  account = {
-    id: undefined, username: undefined, link: '', sessionid: '',
-    current_level: 0, points_to_next_level: '-', experience_bar_width: 0, status: 'ok', current_points: 0, current_floor: 5000
-  };
+  account = {};
   platform = {};
   giveawaysDB = {};
   usersDB = {};
@@ -166,8 +200,8 @@ async function getPlatformsOwnedProducts() {
     if (
       platformKey === 'steam'
       && await checkSteamLogin()
-      && (settings?.lastSteamOwnedProductsRequest || 0) + (30 * 60 * 1000) < Date.now()) // 30m
-    {
+      && ((settings?.lastSteamOwnedProductsRequest || 0) + (30 * 60 * 1000) < Date.now()) // 30m
+    ) {
       settings.lastSteamOwnedProductsRequest = Date.now();
       await setSettings(settings);
       await new Promise(async (resolve) => {
@@ -180,6 +214,7 @@ async function getPlatformsOwnedProducts() {
               await ehf.storage.local.set(`${platformKey}_ownedProductsSub`, ownedProductsSub);
             } else {
               platformJSON.metadata.failedRequest = true;
+              updateSteamLoginIndicator({ status: 'warning', tooltip: '🟡 There was a problem loading your owned Steam products', });
             }
           }).finally(() => { resolve(); });
       });
@@ -189,6 +224,7 @@ async function getPlatformsOwnedProducts() {
         || (ownedProductsApp.length === 0 && ownedProductsSub.length === 0))
     ) {
       platformJSON.metadata.failedRequest = true;
+      updateSteamLoginIndicator({ status: 'warning', tooltip: '🟡 There was a problem loading your owned Steam products', });
     }
     platformJSON.ownedProducts.app = ownedProductsApp;
     platformJSON.ownedProducts.sub = ownedProductsSub;
@@ -353,8 +389,8 @@ function updateGiveawayVisibility(giveawayID) {
     let el = $(`.indiegala-giveaway[data-giveaway-id="${giveawayID}"]`);
     $(el).show();
     if (visibility === 'off') {
-      if (giveawaysDB[giveawayID]?.owner?.id === account.id
-        || giveawaysDB[giveawayID]?.level > account.current_level
+      if (giveawaysDB[giveawayID]?.owner?.id === account?.id
+        || giveawaysDB[giveawayID]?.level > account?.current_level
         || (giveawaysDB[giveawayID] !== undefined && !giveawaysDB[giveawayID].__settings.visible)
         || !productVisibility
         || !ownerVisibility
@@ -646,6 +682,8 @@ async function getProductData(giveaway, force = {}) {
 }
 async function getOwnerData(giveaway) {
   let ownerID = giveawaysDB[giveaway.id].owner.id;
+  $(`.indiegala-giveaway[data-giveaway-id="${giveaway.id}"]`)
+    .find('.items-list-item-type-right-btns-owner-visibility').hide();
   if ((usersDB[ownerID] === undefined
     || (usersDB[ownerID] !== undefined
       && ((usersDB[ownerID].__settings.lastUpdate + (24 * 60 * 60 * 1000)) < Date.now()))) // 24H
@@ -655,20 +693,30 @@ async function getOwnerData(giveaway) {
     let giveawayOwner = ghf.json.parse(ghf.json.stringify(giveawayData.owner));
     ownerUpdating.push(giveawayOwner.id);
     if (usersDB[giveawaysDB[giveaway.id].owner.id] === undefined) {
-      giveawayOwner = { ...{ reputation: '0', reputationCount: '+0 | -0', level: '0', giveawaysCreated: '0', __settings: { lastUpdate: Date.now(), visible: true, } }, ...giveawayOwner };
+      giveawayOwner = { ...{ status: 'active', reputation: '0', reputationCount: '+0 | -0', level: '0', giveawaysCreated: '0', __settings: { lastUpdate: Date.now(), visible: true, } }, ...giveawayOwner };
     } else {
       giveawayOwner = { ...giveawayOwner, ...usersDB[giveawaysDB[giveaway.id].owner.id] };
-      // processOwner(giveaway);
+      processOwner(giveaway);
     }
     ghf.json.value(giveawayOwner, '__settings.lastUpdate', Date.now());
     ghf.json.value(giveawayOwner, '__settings.visible', (usersDB?.[giveawaysDB[giveaway.id].owner.id]?.__settings?.visible ?? true));
 
     if (giveawayOwner.url !== '') {
-      let html = await ehf.fetch(giveawayOwner.url);
-      giveawayOwner.reputation = $(html).find('.user-card-giveaways .user-card-reputation').html();
-      giveawayOwner.reputationCount = $(html).find('.user-card-giveaways .user-card-reputation-count').html();
-      giveawayOwner.level = $(html).find('.user-card-giveaways .user-card-body-col:nth-child(2) .user-card-body-content').html();
-      giveawayOwner.giveawaysCreated = $(html).find('.user-card-giveaways .user-card-body-sep ~ .user-card-body-col-left:first .user-card-body-content').html();
+      let html = await ehf.fetch(giveawayOwner.url).catch(() => { return 'removed' });
+      try {
+        if (html === 'removed') {
+          giveawayOwner.status = 'removed';
+        } else {
+          giveawayOwner.status = $(html).find('.user-card-status').html();
+          giveawayOwner.reputation = $(html).find('.user-card-giveaways .user-card-reputation').html();
+          giveawayOwner.reputationCount = $(html).find('.user-card-giveaways .user-card-reputation-count').html();
+          giveawayOwner.level = $(html).find('.user-card-giveaways .user-card-body-col:nth-child(2) .user-card-body-content').html();
+          giveawayOwner.giveawaysCreated = $(html).find('.user-card-giveaways .user-card-body-sep ~ .user-card-body-col-left:first .user-card-body-content').html();
+        }
+      } catch (e) {
+        console.error('getOwnerData id:', giveaway.id, '; error: ', e);
+        getOwnerData(giveaway);
+      }
     } else {
       giveawayOwner.level = '';
     }
@@ -735,6 +783,7 @@ function checkOwnerVisibility(giveaway) {
   } else if (+giveaway.id > 0 && giveawaysDB[giveaway.id] !== undefined && usersDB[giveawaysDB[giveaway.id].owner.id] !== undefined) {
     $(`.indiegala-giveaway[data-owner-id="${giveawaysDB[giveaway.id].owner.id}"]`).each(async function (i, el) {
       let ownerVisibilityBtn = $(el).find('.items-list-item-type-right-btns-owner-visibility');
+      $(ownerVisibilityBtn).hide();
       let visible = usersDB[giveawaysDB[giveaway.id].owner.id].__settings.visible;
       let visibility = visible ? 'on' : 'off';
       if (visibility === 'off') {
@@ -791,8 +840,8 @@ function processGiveaway(giveaway, force = {}) {
 
     let giveawayData = giveawaysDB[giveaway.id];
     // "Blackout" own giveaways || Giveaways with too high of a level
-    if (giveawayData.owner.id === account.id
-      || giveawayData.level > account.current_level) {
+    if (giveawayData.owner.id === account?.id
+      || giveawayData.level > account?.current_level) {
       $(el).addClass('indiegala-giveaway-blackout');
     }
 
@@ -1174,8 +1223,10 @@ function processOwner(giveaway) {
                           #C10015 ${reputationPercentagePositive}% ${reputationPercentagePositive+reputationPercentageNegative}%,
                           #212121 ${reputationPercentagePositive+reputationPercentageNegative}% 100%
                         `;
+      let status = ownerData.status;
+      let statusIcon = (status === 'active' ? '🟢' : status === 'banned' ? '🔴' : status === 'removed' ? '⚫' : '⚪');
       $(`.indiegala-giveaway[data-owner-id="${ownerID}"] .items-list-item-indicators-icons-owner`)
-        .attr('title', `Username: ${ownerData.name}\nLevel: ${ownerData.level}\nGiveaways created: ${giveawaysCreated}\n👍: ${reputationCountPositive} (${reputationPercentagePositive}%)\n👎: ${reputationCountNegative} (${reputationPercentageNegative}%)\n❔: ${reputationCountUnknown} (${reputationPercentageUnknown}%)`);
+        .attr('title', `Username: ${ownerData.name}\nLevel: ${ownerData.level}\nStatus: ${statusIcon} ${ghf.camelize(status, { upperCamelCase: true })}\nGiveaways created: ${giveawaysCreated}\n👍: ${reputationCountPositive} (${reputationPercentagePositive}%)\n👎: ${reputationCountNegative} (${reputationPercentageNegative}%)\n❔: ${reputationCountUnknown} (${reputationPercentageUnknown}%)`);
     }
     $(`.indiegala-giveaway[data-owner-id="${ownerID}"] .items-list-item-indicators-icons-owner`).css('background', reputationBorder);
     if (!!ownerData.level) {

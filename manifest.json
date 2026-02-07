@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "IG Helper",
-  "version": "3.2.7",
+  "version": "3.3.11",
   "description": "Indiegala Helper",
   "icons": {
     "16": "assets/images/igh-icon/icon_16.ico",

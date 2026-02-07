@@ -94,12 +94,14 @@ async function setupGalaSilver() {
 }
 
 async function setupSteamLoginIndicator() {
-  let steamLoginStatus = await checkSteamLogin();
+  // let steamLoginStatus = await checkSteamLogin();
 
-  $('#igh-steam-login-status')
-    .attr('class', (steamLoginStatus ? 'igh-text-positive' : 'igh-text-negative'))
-    .attr('title', (steamLoginStatus ? `You're logged in to Steam in this browser` : `You're not logged in to Steam in this browser`))
-    .show();
+  // $('#igh-steam-login-status')
+  //   .attr('class', (steamLoginStatus ? 'igh-text-positive' : 'igh-text-negative'))
+  //   .attr('title', (steamLoginStatus ? `You're logged in to Steam in this browser` : `You're not logged in to Steam in this browser`))
+  //   .show();
+  $('#igh-steam-login-status').show();
+  await updateSteamLoginIndicator();
 
   // indiegala.interval.updateSteamLoginIndicator = setInterval(async function () {
   //   let steamLoginStatus = await checkSteamLogin();

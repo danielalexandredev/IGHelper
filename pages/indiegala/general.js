@@ -7,6 +7,21 @@ function updateGalaSilver(galasilver) {
   $('#igh-galasilver .coins-amount').html(galasilver);
   return galasilver;
 }
+async function updateSteamLoginIndicator(data = {}) {
+  let steamLoginStatus = await checkSteamLogin();
+  let statusClass = (steamLoginStatus ? 'igh-text-positive' : 'igh-text-negative');
+  if (data?.status?.length && data.status === 'warning' && steamLoginStatus)
+    statusClass = 'igh-text-warning';
+  let statusTooltip = (steamLoginStatus ? `🟢 You're logged in to Steam in this browser` : `🔴 You're not logged in to Steam in this browser`);
+  if (!ghf.is.jsonEmpty(data) && data?.tooltip?.length) {
+    if (ghf.is.text(data.tooltip))
+      data.tooltip = [data.tooltip];
+    if (ghf.is.array(data.tooltip))
+      data.tooltip = data.tooltip.map(t => (`\n${t}`)).join('');
+    statusTooltip = `${statusTooltip};${data.tooltip};`;
+  }
+  $('#igh-steam-login-status').attr('class', statusClass).attr('title', statusTooltip);
+}
 
 async function getPlatforms() {
   let platforms = await ehf.fetch(chrome.runtime.getURL(`assets/json/platform.json`));
@@ -50,7 +65,10 @@ async function getAccountInfo() {
   let sessionid = sessionidCookie.value;
   let indiegalaAccount = await ehf.storage.local.get('indiegalaAccount');
   if (ghf.is.jsonEmpty(indiegalaAccount)) {
-    indiegalaAccount = account;
+    indiegalaAccount = {
+      id: undefined, username: undefined, link: '', sessionid: '',
+      current_level: 0, points_to_next_level: '-', experience_bar_width: 0, status: 'ok', current_points: 0, current_floor: 5000
+    };
     await ehf.storage.local.set('indiegalaAccount', indiegalaAccount);
   }
   if (!indiegalaAccount.sessionid || indiegalaAccount.sessionid !== sessionid) {
@@ -73,11 +91,12 @@ async function getAccountInfo() {
     || indiegalaAccount.sessionid !== sessionid
     || ((settings?.lastIndiegalaAccountInfoRequest || 0) + (30 * 60 * 1000) < Date.now()) // 30m
   ) {
-    settings.lastIndiegalaAccountInfoRequest = Date.now();
-    await setSettings(settings);
-
-    const accountInfo = await ehf.fetch("https://www.indiegala.com/library/giveaways/user-level-and-coins", { credentials: "include" });
-    Object.assign(indiegalaAccount, accountInfo);
+    await ehf.fetch("https://www.indiegala.com/library/giveaways/user-level-and-coins", { credentials: "include" })
+      .then(async (accountInfo) => {
+        settings.lastIndiegalaAccountInfoRequest = Date.now();
+        await setSettings(settings);
+        Object.assign(indiegalaAccount, accountInfo);
+      });
   }
 
   await ehf.storage.local.set('indiegalaAccount', indiegalaAccount);

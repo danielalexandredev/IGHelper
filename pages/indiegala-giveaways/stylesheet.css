@@ -1,3 +1,9 @@
+#ajax-contents-container.igh-curtain-loading .page-contents-ajax-list-cover {
+  display: block!important;
+}
+#ajax-contents-container.igh-curtain-loading .page-contents-ajax-list {
+  opacity: 0.25!important;
+}
 .page-contents-list-menu-sort.page-contents-list-menu-opacity {
   opacity: 1!important;
 }
